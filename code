@@ -1,0 +1,396 @@
+#include<Adafruit_Sensor.h>
+#include <dht.h>
+#include <LiquidCrystal.h>
+#include <SoftwareSerial.h>
+#include<math.h>
+
+#define dht_dpin A0
+#define trigPin 6
+#define echoPin 7
+#define thermistorPin A3
+#define ldr A4
+#define buzzer 8
+
+
+dht DHT;
+LiquidCrystal lcd(12, 11, 5, 4, 3, 2);
+//this section is for the symbol of degree
+byte deg[8] =
+{
+  0b01110,
+  0b01010,
+  0b01110,
+  0b00000,
+  0b00000,
+  0b00000,
+  0b00000,
+  0b00000
+};
+
+
+long duration;
+int distance;
+float sos;
+int transistor = 9;
+int Transistor = A1;
+int transistor1 = A4;
+int Transistor1 = 5;
+float t;
+float R, H;
+int ThermistorPin = A3;
+int Vo, V1;
+float R1 = 10000, R3 = 10000;
+float logR2, R2, logR4, R4, T, T1, TD;
+float c1 = -0.0009500542517871515, c2 = 0.000589776210603468, c3 = -0.0000014276195692161472;
+float a1 = -8.78469475556, a2 = 1.61139411, a3 = 2.33854883889, a4 = -0.14611605, a5 = -0.012308094, a6 = -0.0164248277778, a7 = 0.002211732, a8 = 0.00072546, a9 = -0.000003582;
+int HI;
+static int flag = 0;
+static char data = 0;
+int ldrv = 0;
+
+
+void setup() {
+
+  while (!Serial) {
+    ;                            // wait for serial port to connect. Needed for native USB port only
+  }
+
+  pinMode(trigPin, OUTPUT);
+  pinMode(echoPin, INPUT);
+  pinMode(transistor, OUTPUT);
+  pinMode(Transistor, OUTPUT);
+  pinMode(buzzer, OUTPUT);
+  pinMode(ldr, INPUT);
+
+  Serial.begin(9600);
+
+  Serial.println("text On");
+  analogWrite(Transistor, 255);
+  delay(20);
+
+  //initialise for at least 2s
+  lcd.begin(16, 2);
+  lcd.print("INITIALIZING");
+  delay(500);
+  lcd.print(".");
+  delay(500);
+  lcd.print(".");
+  delay(500);
+  lcd.print(".");
+  delay(500);
+  lcd.print(".");
+  delay(500);
+  lcd.createChar(0, deg);
+
+}
+
+
+
+void loop()
+{
+
+  ldrv = analogRead(ldr);
+  float v = ldrv / 204.6;
+  float resi = (11000 - v * 2200) / v;
+  Serial.print("Light Intensity = ");
+  float lux = (pow( resi, (1 / -0.8616))) / (pow( 10, (5.118 / -0.8616)));
+  Serial.print(lux);
+  Serial.println(" LUX");
+
+
+
+
+
+
+
+
+  Serial.print("Distance:");
+  Serial.print(distance);
+  Serial.println(" cm");
+  delay(100);
+
+  distance = 0;
+
+  digitalWrite(trigPin, LOW);
+  delay(100);
+
+  digitalWrite(trigPin, HIGH);
+  delay(100);
+  digitalWrite(trigPin, LOW);
+
+
+  duration = pulseIn(echoPin, HIGH);
+  t = DHT.temperature;
+  R = DHT.humidity;
+  sos = 331.4 + (0.606 * t) + 0.0124 * (R); // adjust speed using temp and hum
+  distance = duration * (sos / 10000) / 2;
+
+
+  if (Serial.available() > 0) {
+    data = Serial.read();
+  }
+
+
+  if (data == '3' )
+  {
+    analogWrite(transistor, 0);
+    Serial.println("led Off");
+    Serial.println("text On");
+    delay(10);
+  }
+
+
+
+
+
+  if (data != '3' )
+  {
+
+    if (Serial.available() > 0) {
+      data = Serial.read();       // input once
+    }
+
+    if (((  (distance < 48)  ) ) || (Serial.available() > 0 ))
+    {
+      if (distance < 48)
+      {
+
+        if ((ldrv < 250) && (ldrv >= 0))
+        {
+          Serial.println("led On high");
+          analogWrite(transistor, 255);
+        }
+
+        else if ((ldrv >= 250) && (ldrv <= 490))
+        {
+          Serial.println("led On medium 1");
+          analogWrite(transistor, 192);
+        }
+
+
+        else if ((ldrv > 490) && (ldrv <= 730))
+        {
+          Serial.println("led On medium 2");
+          analogWrite(transistor, 128);
+        }
+
+        else if ((ldrv > 730 ) && (ldrv <= 900))
+        {
+          Serial.println("led On low");
+          analogWrite(transistor, 64);
+        }
+        else
+        {
+          analogWrite(transistor, 0);
+          Serial.println("led Off");
+        }
+
+
+        if (flag == 0)
+        { tone(8, 1000, 100);
+        }
+        flag = 1;
+
+        delay(100);
+
+
+        if (Serial.available() > 0) {
+          if (data == '3')
+          {
+
+            data = Serial.read();
+            Serial.println(data);
+            Serial.print(" ");
+            analogWrite(transistor, 0);
+            delay(10);
+          }
+
+
+        }
+      }
+
+
+
+
+
+      else if ((Serial.available() > 0) )
+      {
+        data = Serial.read();         // input twice to access
+        Serial.println(data);
+        Serial.print(" ");
+
+
+        if (data == '1')
+        { analogWrite(transistor, 255);
+
+
+          if (flag == 0)
+          { tone(8, 1000, 100);
+          }
+          flag = 1;
+
+          delay(10);
+
+        }
+        else if (data == '0')
+        {
+          analogWrite(transistor, 0);
+          flag = 0;
+        }
+
+
+
+
+
+      }
+
+    }
+
+
+
+    else
+    {
+      analogWrite(transistor, 0);
+      Serial.println("led Off");
+      flag = 0;
+    }
+    delay(10);
+
+
+    if (Serial.available() > 0) {
+      data = Serial.read();        // input twice
+      Serial.println(data);
+      Serial.print(" ");
+    }
+
+    if ((((distance < 98) )) || (Serial.available() > 0))
+    {
+
+      if (distance < 98)
+      {
+
+
+        Serial.println("text On");
+        analogWrite(Transistor, 255);
+        delay(10);
+
+
+
+
+      }
+      else if (Serial.available() > 0)
+      {
+        data = Serial.read();              //1122 for text+led on for 1 cycle
+        Serial.println(data);             // input 2 times to access
+        Serial.print(" ");
+
+        if (data == '2')
+        { analogWrite(Transistor, 255);
+          delay(10);
+        }
+        else if (data == '0')
+        { analogWrite(Transistor, 0);
+          delay(10);
+
+        }
+
+
+      }
+
+
+    }
+
+    else
+    {
+      analogWrite(Transistor, 0);
+      Serial.println("text Off");
+    }
+    delay(10);
+
+
+  }
+
+
+
+
+
+
+
+  Vo = analogRead(ThermistorPin);
+  R2 = R1 * (1023.0 / (float)Vo - 1.0);
+  logR2 = log(R2);
+  T = (1.0 / (c1 + c2 * logR2 + c3 * logR2 * logR2 * logR2));
+  T = T - 273.15;
+  
+  delay(5500);
+
+  V1 = analogRead(ThermistorPin);
+  R4 = R3 * (1023.0 / (float)V1 - 1.0);
+  logR4 = log(R4);
+  T1 = (1.0 / (c1 + c2 * logR4 + c3 * logR4 * logR4 * logR4));
+  T1 = T1 - 273.15;
+
+
+  Serial.print("Change in temperature = ");
+  Serial.print(T1 - T);
+  Serial.println(" C");
+
+  Serial.print("Temperature = ");
+  Serial.print(t);
+  Serial.println(" C");
+
+  float E = 0;
+  E = DHT.temperature + T1 - T;
+
+
+
+  Serial.print("Effective Temperature = "); // assuming same ambient temperature for DHT11 and thermistor
+  Serial.print(E );
+  Serial.println(" C");
+
+
+
+
+  float R;
+  R = (T1 - T) / (T1) * 100;
+  Serial.print("The rate of change of temperature = ");
+  Serial.print(R);
+  Serial.println(" %");
+
+  Serial.print("Humidity = ");
+  R = DHT.humidity;
+  Serial.print( (int)R);
+  Serial.println(" %");
+
+
+  t = DHT.temperature, R = DHT.humidity;
+  HI = a1 + (a2) * t + (a3) * R + (a4) * t * R + (a5) * t * t + (a6) * R * R + (a7) * t * t * R + (a8) * t * R * R + (a9) * t * t * R * R;
+  Serial.print("Humiture = ");
+  Serial.print(HI );
+  Serial.println(" C");
+
+  H = (log10(R) - 2.0) / 0.4343 + (17.62 * t) / (243.12 + t);
+  TD = 243.12 * H / (17.62 - H);
+  Serial.print("Dew Point = ");
+  Serial.print(TD );
+  Serial.println(" C");
+
+  Serial.println(" ");
+
+
+
+
+
+
+  DHT.read11(dht_dpin);
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Temperature:");
+  lcd.print((int)DHT.temperature);
+  lcd.write((uint8_t)0);
+  lcd.print("C");
+  lcd.setCursor(0, 1);
+  lcd.print("Humidity:");
+  lcd.print((int)DHT.humidity);
+  lcd.print("%");
+}
